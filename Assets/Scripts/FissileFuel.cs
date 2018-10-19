@@ -13,10 +13,16 @@ public class FissileFuel : Particle {
 		am.unreactedFuel.Remove(this);
 	}
 
-	void OnTriggerEnter2D(Collider2D other) {
+	void OnCollisionEnter2D(Collision2D other) {
 		if(other.gameObject.CompareTag("Neutron")) {
-			Destroy(other.gameObject);
-			Fission();
+			Neutron neutron = other.gameObject.GetComponent<Neutron>();
+			float chance = 1f/(float)neutron.speedLevel;
+			if(chance >= Random.value) {
+				Destroy(other.gameObject);
+				Fission();
+			} else {
+				neutron.Bounce(other.GetContact(0).normal);
+			}
 		}
 	}
 

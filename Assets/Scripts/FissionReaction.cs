@@ -21,10 +21,12 @@ public class FissionReaction : Particle {
 
 	void Start() {
 		am.reactions.Add(this);
+		am.observer.stats.fuelsFissioned ++;
 	}
 
 	void OnDestroy() {
-		am.reactions.Remove(this);
+		if(am.reactions.Contains(this))
+			am.reactions.Remove(this);
 	}
 
 	void Update() {
@@ -35,12 +37,21 @@ public class FissionReaction : Particle {
 	}
 
 	public GameObject Release() {
+		GetComponent<Animator>().SetTrigger("Release");
+
 		GameObject neutron = Instantiate(neutronPrefab,transform.position,Quaternion.identity);
+		neutron.GetComponent<Neutron>().StartMovingIn(0.5f);
 
 		neutronsLeft --;
-		if(neutronsLeft <= 0)
-			Destroy(gameObject);
+		if(neutronsLeft <= 0) {
+			GetComponent<Animator>().SetTrigger("Destroy");
+			am.reactions.Remove(this);
+		}
 
 		return neutron;
+	}
+
+	public void Destroy() {
+		Destroy(gameObject);
 	}
 }

@@ -11,8 +11,14 @@ public class ArenaManager : MonoBehaviour {
 	public Transform neutronStart;
 	public TimelineAsset onEnd;
 	[Header("Values")]
+	public bool useMovingCamera = false;
+	public float delayBeforeStart = 0.5f;
+	public WinCondition winCondition;
+	public bool allowsRespawn = true;
 	public List<Rod> rods;
-	public bool tutorial = false;
+	public int startingSpeedLevel = 8;
+
+	public ArenaObserver observer;
 
 
 
@@ -23,7 +29,7 @@ public class ArenaManager : MonoBehaviour {
 	[HideInInspector]
 	public Neutron neutron;
 	// [HideInInspector]
-	public CompletionStatus completeState = CompletionStatus.Incomplete;
+	public bool isComplete = false;
 
 	public StateMachine<ArenaManager> stateMachine;
 
@@ -38,6 +44,7 @@ public class ArenaManager : MonoBehaviour {
 
 	void Update() {
 		stateMachine.Update();
+		observer.Update();
 	}
 
 
@@ -61,67 +68,84 @@ public class ArenaManager : MonoBehaviour {
 			foreach(Rod rod in owner.rods) {
 				rod.Fill(owner);
 			}
+			owner.StartCoroutine(StartGameAfterDelay());
 		}
 
-		public override void OnStay() {
-			if(owner.tutorial)
-				owner.stateMachine.Next(new TutorialState());
-			else
-				owner.stateMachine.Next(new GameState());
+		IEnumerator StartGameAfterDelay() {
+			yield return null;
+			yield return new WaitForSeconds(owner.delayBeforeStart);
+			owner.stateMachine.Next(new GameState());
 		}
 	}
 	
 	// --------------------------------------------------------------------------
-	public class TutorialState : State<ArenaManager> {
+	public class GameState : State<ArenaManager> {
 		public override void OnEnter() {
-			ReleaseNewNeutron();
+			owner.observer.StartCountingTime();
+			ReleaseNewNeutron(true);
+			owner.neutron.speedLevel = owner.startingSpeedLevel;
 		}
 		public override void OnStay() {
-			if(owner.unreactedFuel.Count == 0) {
-				owner.completeState = CompletionStatus.Success;
-				owner.stateMachine.Next(null);
+			if(owner.winCondition == WinCondition.NoUnreactedFuels && owner.unreactedFuel.Count == 0) {
+				ExitState(true);
 				return;
 			}
 
 			if(owner.neutron == null) {
-				ReleaseNewNeutron();
+				if(owner.winCondition == WinCondition.FirstDeath) {
+					ExitState(true);
+				} else {
+					ReleaseNewNeutron();
+				}
 			}
 		}
 
-		void ReleaseNewNeutron() {
+		void ReleaseNewNeutron(bool first=false) {
+			owner.observer.stats.neutronsUsed ++;
 			if(owner.reactions.Count > 0)
 				owner.neutron = owner.reactions[0].Release().GetComponent<Neutron>();
-			else
+			else if(owner.neutronStart != null && (owner.allowsRespawn || first)) {
 				owner.neutron = Instantiate(owner.neutronPrefab,owner.neutronStart.position,Quaternion.identity).GetComponent<Neutron>();
+				owner.neutron.StartMovingIn(0.5f);
+			} else {
+				owner.observer.stats.neutronsUsed --;
+				ExitState(false);
+			}
+		}
+
+		void ExitState(bool win) {
+			owner.observer.StopCountingTime();
+			owner.observer.stats.win = win;
+			owner.isComplete = true;
+			owner.stateMachine.Next(null);
 		}
 	}
 	// --------------------------------------------------------------------------
-	public class GameState : State<ArenaManager> {
-		public override void OnStay() {
-			if(owner.neutron == null) {
-				ReleaseNewNeutron();
-			}
+	// public class GameState : State<ArenaManager> {
+	// 	public override void OnStay() {
+	// 		if(owner.neutron == null) {
+	// 			ReleaseNewNeutron();
+	// 		}
 
-			if(owner.unreactedFuel.Count == 0) {
-				owner.completeState = CompletionStatus.Success;
-				owner.stateMachine.Next(null);
-			}
-		}
+	// 		if(owner.unreactedFuel.Count == 0) {
+	// 			owner.isComplete = true;
+	// 			owner.stateMachine.Next(null);
+	// 		}
+	// 	}
 
-		void ReleaseNewNeutron() {
-			if(owner.reactions.Count == 0) {
-				owner.completeState = CompletionStatus.Failure;
-				owner.stateMachine.Next(null);
-				return;
-			}
+	// 	void ReleaseNewNeutron() {
+	// 		if(owner.reactions.Count == 0) {
+	// 			owner.isComplete = true;
+	// 			owner.stateMachine.Next(null);
+	// 			return;
+	// 		}
 
-			owner.neutron = owner.reactions[0].Release().GetComponent<Neutron>();
-		}
-	}
+	// 		owner.neutron = owner.reactions[0].Release().GetComponent<Neutron>();
+	// 	}
+	// }
 }
 
-public enum CompletionStatus {
-	Incomplete,
-	Success,
-	Failure
+public enum WinCondition {
+	NoUnreactedFuels,
+	FirstDeath
 }

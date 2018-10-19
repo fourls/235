@@ -1,10 +1,13 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Cinemachine;
 
 public class GameManager : MonoBehaviour {
 	public static GameManager ins = null;
+	// public Animator cameraAnimator;
 	public ArenaManager arena = null;
+	public ArenaManager lastArena = null;
 
 	public StateMachine<GameManager> stateMachine;
 
@@ -31,15 +34,17 @@ public class GameManager : MonoBehaviour {
 	// --------------------------------------------------------------------------
 	public class InArenaState : State<GameManager> {
 		public override void OnEnter() {
+			// owner.cameraAnimator.SetBool("InGame",owner.arena.useMovingCamera);
 			owner.arena.stateMachine.Next(new ArenaManager.SetupState());
 		}
 
 		public override void OnStay() {
-			if(owner.arena.completeState != CompletionStatus.Incomplete) {
+			if(owner.arena.isComplete) {
 				if(owner.arena.onEnd != null) {
 					DirectorController.ins.Play(owner.arena.onEnd);
 				}
 				owner.arena.stateMachine.Next(null);
+				owner.lastArena = owner.arena;
 				owner.arena = null;
 				owner.stateMachine.Next(new WaitingState());
 			}

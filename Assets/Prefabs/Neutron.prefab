@@ -342,8 +342,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   arrow: {fileID: 4390885089980714}
   rotationSpeed: 5
-  baseSpeed: 5
-  speedLevel: 3
+  baseSpeed: 2
+  speedLevel: 8
 --- !u!114 &114515062220117994
 MonoBehaviour:
   m_ObjectHideFlags: 1
